@@ -17,24 +17,15 @@
 package com.hippo.fresco.large;
 
 /*
- * Created by Hippo on 5/22/2017.
+ * Created by Hippo on 5/24/2017.
  */
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Rect;
-import java.io.Closeable;
-import javax.annotation.Nullable;
+import android.graphics.drawable.Drawable;
 
-public interface ImageRegionDecoder extends Closeable {
-
-  int getWidth();
-
-  int getHeight();
-
-  @Nullable
-  Bitmap decode(Rect rect);
+public class SubsamplingDrawableFactory extends LargeDrawableFactory {
 
   @Override
-  void close();
+  public Drawable createLargeDrawable(ClosableLargeImage image) {
+    return new SubsamplingDrawable(image.getDecoder());
+  }
 }

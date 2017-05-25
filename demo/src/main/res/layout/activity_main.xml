@@ -20,9 +20,10 @@
   android:layout_width="match_parent"
   android:layout_height="match_parent">
 
-  <com.facebook.drawee.view.SimpleDraweeView
+  <com.facebook.drawee.view.SimpleDraweeView xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/image"
     android:layout_width="1024px"
-    android:layout_height="768px"/>
+    android:layout_height="768px"
+    app:actualImageScaleType="fitXY"/>
 
 </FrameLayout>

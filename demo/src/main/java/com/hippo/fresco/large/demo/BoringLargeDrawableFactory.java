@@ -40,7 +40,7 @@ public class BoringLargeDrawableFactory extends LargeDrawableFactory {
         ImageRegionDecoder decoder = reference.get();
         Rect rect = new Rect();
         rect.set(0, 0, decoder.getWidth(), decoder.getHeight());
-        Bitmap bitmap = decoder.decode(rect, null);
+        Bitmap bitmap = decoder.decode(rect);
         if (bitmap != null) {
           return new RecyclableBitmapDrawable(bitmap);
         }

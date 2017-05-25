@@ -50,14 +50,13 @@ public class SkipImageRegionDecoder implements ImageRegionDecoder {
 
   @Nullable
   @Override
-  public Bitmap decode(Rect rect, BitmapFactory.Options options) {
-    return decoder.decodeRegion(rect, options);
+  public Bitmap decode(Rect rect) {
+    return decoder.decodeRegion(rect, null);
   }
 
   @Override
   public void close() {
     decoder.recycle();
-    decoder = null;
   }
 
   @Nullable

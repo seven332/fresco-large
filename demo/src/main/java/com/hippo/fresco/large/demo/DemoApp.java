@@ -20,7 +20,11 @@ package com.hippo.fresco.large.demo;
  * Created by Hippo on 5/23/2017.
  */
 
+import static junit.framework.Assert.assertEquals;
+
 import android.app.Application;
+import android.graphics.Matrix;
+import android.util.Log;
 import com.facebook.drawee.backends.pipeline.DraweeConfig;
 import com.facebook.drawee.backends.pipeline.Fresco;
 import com.facebook.imageformat.DefaultImageFormats;
@@ -40,8 +44,6 @@ public class DemoApp extends Application {
 
     FrescoLargeConfig.Builder builder = FrescoLargeConfig.newBuilder();
     builder.setThresholdSize(256, 256);
-    LargeDrawableFactory drawableFactory = new BoringLargeDrawableFactory();
-    builder.setLargeDrawableFactory(drawableFactory);
     ImageRegionDecoderFactory decoderFactory = new SkiaImageRegionDecoderFactory();
     builder.addDecoder(DefaultImageFormats.JPEG, decoderFactory);
     builder.addDecoder(DefaultImageFormats.PNG, decoderFactory);

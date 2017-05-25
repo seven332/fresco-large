@@ -36,7 +36,7 @@ public class FrescoLargeConfig {
   private final Map<ImageFormat, ImageSizeDecoder> sizeDecoderMap;
   private final Map<ImageFormat, ImageRegionDecoderFactory> regionDecoderFactoryMap;
   private final Map<ImageFormat, ImageDecoder> imageDecoderMap;
-  private final LargeDrawableFactory largeDrawableFactory;
+  private LargeDrawableFactory largeDrawableFactory;
   private final int thresholdWidth;
   private final int thresholdHeight;
 
@@ -72,6 +72,9 @@ public class FrescoLargeConfig {
   }
 
   public LargeDrawableFactory getLargeDrawableFactory() {
+    if (largeDrawableFactory == null) {
+      largeDrawableFactory = new SubsamplingDrawableFactory();
+    }
     return largeDrawableFactory;
   }
 
