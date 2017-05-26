@@ -72,6 +72,8 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
   private int currentSample;
   // Sample for image fill windows
   private int fullSample;
+  // Whether draw full sample tiles
+  private boolean drawFullSampleTiles;
   private final SparseArray<List<Tile>> tilesMap = new SparseArray<>();
 
   private RectF debugRectF;
@@ -201,9 +203,10 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
 
   private int getCurrentSample() {
     float[] matrixValue = getMatrixValue();
-    float scale = Math.min(matrixValue[Matrix.MSCALE_X], matrixValue[Matrix.MSCALE_Y]);
-    int scaleInt = Math.max(1, (int) scale);
-    currentSample = prevPow2(scaleInt);
+    currentSample = calculateSample((int) matrixValue[Matrix.MSCALE_X],
+        (int) matrixValue[Matrix.MSCALE_Y]);
+    // Current sample can't be bigger than full sample
+    currentSample = Math.min(currentSample, fullSample);
     return currentSample;
   }
 
@@ -220,10 +223,22 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
     return visibleRect;
   }
 
-  private void drawCurrentTiles(Canvas canvas) {
+  // Gets the tile which is in full sample and contains this tile
+  private Tile getTheFullSampleTile(Tile tile) {
+    if (tile.sample == fullSample) {
+      return tile;
+    }
 
-    // TODO Draw the tile in full tile list if it is not loaded.
+    for (Tile fullSampleTile : tilesMap.get(fullSample)) {
+      if (fullSampleTile.contains(tile)) {
+        return fullSampleTile;
+      }
+    }
 
+    throw new RuntimeException("getTheFullSampleTile() should always returns a tile.");
+  }
+
+  private void drawTiles(Canvas canvas) {
     // Get current sample
     int currentSample = getCurrentSample();
 
@@ -237,10 +252,44 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
     // Get visible rect in the image
     Rect visibleRect = getVisibleRect();
 
-    for (Tile tile : currentTileList) {
-      if (tile.updateVisibility(visibleRect)) {
-        tile.load();
-        tile.draw(canvas, paint, matrix, tempMatrix);
+    if (currentSample == fullSample) {
+      // Current sample is full sample
+      // No need to use the full sample tile to fill unloaded current sample tile
+      drawFullSampleTiles = false;
+
+      for (Tile tile : currentTileList) {
+        if (tile.updateVisibility(visibleRect)) {
+          tile.load();
+          tile.draw(canvas, paint, matrix, tempMatrix);
+        }
+      }
+    } else {
+      // Current sample is not full sample
+      // Use the full sample tile to fill unloaded current sample tile
+      drawFullSampleTiles = true;
+
+      // Reset visibility of all tiles in full sample tiles
+      List<Tile> fullTileList = tilesMap.get(fullSample);
+      for (Tile tile : fullTileList) {
+        tile.setVisibility(false);
+      }
+
+      for (Tile tile : currentTileList) {
+        if (tile.updateVisibility(visibleRect)) {
+          if (tile.isLoaded()) {
+            // The tile has a bitmap, just draw it
+            tile.draw(canvas, paint, matrix, tempMatrix);
+          } else {
+            tile.load();
+            // The tile doesn't have a bitmap, try to draw a bitmap in full sample tile
+            Tile fullSampleTile = getTheFullSampleTile(tile);
+            // Use the visible to mark drew tile to avoid draw it twice
+            if (!fullSampleTile.isVisible()) {
+              fullSampleTile.setVisibility(true);
+              fullSampleTile.draw(canvas, paint, matrix, tempMatrix);
+            }
+          }
+        }
       }
     }
 
@@ -249,15 +298,9 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
 
   @Override
   public void draw(@Nonnull Canvas canvas) {
-
-    // TODO Only draw it if the full tile list is decode
-
-    if (windowWidth <= 0 || windowHeight <= 0 || maxTileSize <= 0) {
-      // Not ready
-      return;
+    if (windowWidth > 0 || windowHeight > 0 || maxTileSize > 0) {
+      drawTiles(canvas);
     }
-
-    drawCurrentTiles(canvas);
   }
 
   @Override
@@ -347,11 +390,26 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
     }
 
     /**
+     * Returns {@code true} if the rect contain that rect.
+     */
+    public boolean contains(Tile tile) {
+      return rect.contains(tile.rect);
+    }
+
+    /**
      * Update the visibility according to the visible rect in the image.
      * Returns {@code true} if it's visible.
      */
     public boolean updateVisibility(Rect visibleRect) {
       visible = Rect.intersects(visibleRect, rect);
+      return visible;
+    }
+
+    /**
+     * Set the visibility.
+     */
+    public boolean setVisibility(boolean visible) {
+      this.visible = visible;
       return visible;
     }
 
@@ -370,6 +428,13 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
         task = new LoadingTask();
         task.execute();
       }
+    }
+
+    /**
+     * Returns {@code true} if the tile has a bitmap.
+     */
+    public boolean isLoaded() {
+      return bitmap != null;
     }
 
     /**
@@ -417,7 +482,8 @@ public class SubsamplingDrawable extends Drawable implements DrawableWithCaches 
       this.task = null;
       this.failed = bitmap == null;
 
-      if (bitmap != null && visible && sample == currentSample) {
+      if (bitmap != null && visible &&
+          (sample == currentSample || (sample == fullSample && drawFullSampleTiles))) {
         invalidateSelf();
       }
     }
