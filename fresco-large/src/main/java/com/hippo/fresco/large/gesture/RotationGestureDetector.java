@@ -30,14 +30,15 @@ public class RotationGestureDetector {
 
   private int id1 = INVALID_POINTER_ID;
   private int id2 = INVALID_POINTER_ID;
+  private boolean forceBlock;
   private boolean rotated;
   private float lastX1, lastY1;
   private float lastX2, lastY2;
   private float lastAngle = Float.NaN;
 
-  private final Listener listener;
+  private final OnRotateGestureListener listener;
 
-  public RotationGestureDetector(Listener listener) {
+  public RotationGestureDetector(OnRotateGestureListener listener) {
     this.listener = listener;
   }
 
@@ -48,6 +49,7 @@ public class RotationGestureDetector {
         id2 = INVALID_POINTER_ID;
         lastAngle = Float.NaN;
         rotated = false;
+        forceBlock = false;
         break;
       }
       case MotionEvent.ACTION_POINTER_DOWN: {
@@ -75,6 +77,10 @@ public class RotationGestureDetector {
         break;
       }
       case MotionEvent.ACTION_MOVE: {
+        if (forceBlock) {
+          // listener.onRotateBegin() returns false
+          break;
+        }
         if (id1 == INVALID_POINTER_ID || id2 == INVALID_POINTER_ID) {
           // Two pointer has not been caught
           break;
@@ -107,19 +113,18 @@ public class RotationGestureDetector {
         }
 
         // Check whether rotated
-        boolean firstCallback = false;
+        boolean beginRotating = false;
         if (!rotated) {
-          rotated = Math.abs(rotation) > ROTATION_SLOP;
+          rotated = (Math.abs(rotation) > ROTATION_SLOP) &&
+              !(forceBlock = !listener.onRotateBegin());
           if (rotated) {
-            firstCallback = true;
+            beginRotating = true;
           } else {
             break;
           }
         }
 
-        // Ignore the first callback. The value of the first callback is larger than
-        // the ROTATION_SLOP. It's a mutation, not friendly.
-        if (!firstCallback) {
+        if (!beginRotating) {
           // Get intersection of two lines
           float denominator = (lastX1 - lastX2) * (y1 - y2) - (lastY1 - lastY2) * (x1 - x2);
           if (denominator == 0.0f) {
@@ -132,7 +137,7 @@ public class RotationGestureDetector {
               x1 * y2 - y1 * x2)) / denominator;
 
           // Callback
-          listener.onRotate(rotation, x, y);
+          forceBlock = !listener.onRotate(rotation, x, y);
         }
 
         // Update lastX, lastY, lastAngle
@@ -146,10 +151,20 @@ public class RotationGestureDetector {
       case MotionEvent.ACTION_POINTER_UP: {
         int id = event.getPointerId(event.getActionIndex());
         if (id1 == id) {
+          if (rotated) {
+            // Callback
+            listener.onRotateEnd();
+          }
+
           id1 = INVALID_POINTER_ID;
           lastAngle = Float.NaN;
           rotated = false;
         } else if (id2 == id) {
+          if (rotated) {
+            // Callback
+            listener.onRotateEnd();
+          }
+
           id2 = INVALID_POINTER_ID;
           lastAngle = Float.NaN;
           rotated = false;
@@ -158,10 +173,16 @@ public class RotationGestureDetector {
       }
       case MotionEvent.ACTION_UP:
       case MotionEvent.ACTION_CANCEL: {
+        if (rotated) {
+          // Callback
+          listener.onRotateEnd();
+        }
+
         id1 = INVALID_POINTER_ID;
         id2 = INVALID_POINTER_ID;
         lastAngle = Float.NaN;
         rotated = false;
+        forceBlock = false;
         break;
       }
     }
@@ -169,7 +190,12 @@ public class RotationGestureDetector {
     return rotated;
   }
 
-  public interface Listener {
-    void onRotate(float angle, float x, float y);
+  public interface OnRotateGestureListener {
+
+    boolean onRotate(float angle, float x, float y);
+
+    boolean onRotateBegin();
+
+    void onRotateEnd();
   }
 }
